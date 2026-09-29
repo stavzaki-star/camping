@@ -192,7 +192,7 @@ h1 {
   font-size: .92rem;
 }
 
-:where(.btn, .chip, .tick, .del, .field, .who, .plist input):focus-visible {
+:where(.btn, .chip, .tick, .del, .pdel, .field, .who, .plist input):focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
@@ -346,7 +346,7 @@ h1 {
 .editing .txt { gap: 6px; }
 .editing .row { align-items: flex-start; padding-block: 12px; }
 .editing .del { display: inline-flex; }
-.del {
+.del, .pdel {
   flex: none;
   align-items: center;
   height: 42px;
@@ -359,7 +359,7 @@ h1 {
   font-size: .9rem;
   cursor: pointer;
 }
-.del[data-armed="1"] { border-color: var(--danger); color: var(--danger); font-weight: 700; }
+.del[data-armed="1"], .pdel[data-armed="1"] { border-color: var(--danger); color: var(--danger); font-weight: 700; }
 .add {
   display: none;
   flex-wrap: wrap;
@@ -370,8 +370,9 @@ h1 {
 .editing .add { display: flex; }
 .add .field { flex: 1 1 9rem; width: auto; }
 
-/* Personal list */
+/* Personal list: shared list of names, ticks kept on each device */
 .personal { margin-block-start: 36px; }
+.personal-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .personal h2 {
   margin: 0;
   font-family: var(--font-display);
@@ -379,7 +380,9 @@ h1 {
   font-size: 2.15rem;
   line-height: 1;
 }
-.personal > p { margin: 6px 0 0; color: var(--ink-soft); font-size: .92rem; max-width: 36em; }
+.btn.tiny { min-height: 34px; padding-inline: 13px; font-size: .86rem; }
+.personal-note { margin: 6px 0 0; color: var(--ink-soft); font-size: .92rem; max-width: 36em; }
+.pstate { margin: 12px 0 0; color: var(--ink-soft); font-size: .92rem; }
 .plist {
   list-style: none;
   margin: 12px 0 0;
@@ -388,10 +391,20 @@ h1 {
   grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
   column-gap: 20px;
 }
-.plist li { border-block-start: 1px solid var(--rule); }
-.plist label { display: flex; align-items: center; gap: 12px; min-height: 46px; cursor: pointer; }
-.plist input { flex: none; width: 20px; height: 20px; margin: 0; accent-color: var(--ink); }
-.plist input:checked + span { color: var(--ink-soft); text-decoration: line-through; text-decoration-thickness: 1px; }
+.plist li { display: flex; align-items: center; gap: 8px; min-height: 46px; border-block-start: 1px solid var(--rule); }
+.plist label { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 46px; cursor: pointer; }
+.plist label span { overflow-wrap: anywhere; }
+.plist input[type=checkbox] { flex: none; width: 20px; height: 20px; margin: 0; accent-color: var(--ink); }
+.plist input[type=checkbox]:checked + span { color: var(--ink-soft); text-decoration: line-through; text-decoration-thickness: 1px; }
+.plist .pname-in, .plist .pdel { display: none; }
+.p-editing .plist { grid-template-columns: 1fr; }
+.p-editing .plist li { padding-block: 6px; }
+.p-editing .plist label { display: none; }
+.p-editing .plist .pname-in { display: block; flex: 1; }
+.p-editing .plist .pdel { display: inline-flex; }
+.padd { display: none; flex-wrap: wrap; gap: 8px; padding-block: 12px; border-block-start: 1px dashed var(--rule-strong); }
+.p-editing .padd { display: flex; }
+.padd .field { flex: 1 1 12rem; width: auto; }
 
 .foot { margin-block-start: 32px; padding-block-start: 14px; border-block-start: 1px solid var(--rule); font-size: .84rem; color: var(--ink-soft); }
 .foot p { margin: 0; }
@@ -489,23 +502,18 @@ h1 {
   </div>
   <div class="cats" id="cats"></div>
 
-  <section class="personal" aria-labelledby="personal-h">
-    <h2 id="personal-h">כל אחד לעצמו</h2>
-    <p>את אלה לא משבצים: כל אחד אורז לעצמו. הסימונים כאן נשמרים רק במכשיר שלך.</p>
-    <ul class="plist">
-      <li><label><input type="checkbox" id="me-tent"><span>אוהל, יתדות ופטיש</span></label></li>
-      <li><label><input type="checkbox" id="me-bag"><span>שק שינה</span></label></li>
-      <li><label><input type="checkbox" id="me-mat"><span>מזרן או מזרון מתנפח (+ משאבה)</span></label></li>
-      <li><label><input type="checkbox" id="me-pillow"><span>כרית</span></label></li>
-      <li><label><input type="checkbox" id="me-headlamp"><span>פנס ראש</span></label></li>
-      <li><label><input type="checkbox" id="me-warm"><span>ביגוד חם ללילה</span></label></li>
-      <li><label><input type="checkbox" id="me-towel"><span>מגבת וכלי רחצה</span></label></li>
-      <li><label><input type="checkbox" id="me-flipflops"><span>כפכפים</span></label></li>
-      <li><label><input type="checkbox" id="me-sun"><span>כובע וקרם הגנה</span></label></li>
-      <li><label><input type="checkbox" id="me-spray"><span>ספריי נגד יתושים</span></label></li>
-      <li><label><input type="checkbox" id="me-charger"><span>מטען וכבל לטלפון</span></label></li>
-      <li><label><input type="checkbox" id="me-meds"><span>תרופות אישיות</span></label></li>
-    </ul>
+  <section class="personal" id="personal" aria-labelledby="personal-h">
+    <div class="personal-h">
+      <h2 id="personal-h">כל אחד לעצמו</h2>
+      <button type="button" class="btn ghost tiny" id="pEditBtn" aria-pressed="false" hidden>עריכה</button>
+    </div>
+    <p class="personal-note">את אלה לא משבצים: כל אחד אורז לעצמו. הרשימה משותפת לכולם, והסימונים ✓ נשמרים רק במכשיר שלך.</p>
+    <p class="pstate" id="pState">טוען…</p>
+    <ul class="plist" id="plist"></ul>
+    <form class="padd" id="padd" novalidate>
+      <input class="field" id="paddName" type="text" maxlength="60" autocomplete="off" placeholder="פריט חדש" aria-label="פריט חדש לרשימה האישית">
+      <button type="submit" class="btn small">הוספה</button>
+    </form>
   </section>
 
   <footer class="foot">

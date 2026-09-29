@@ -56,3 +56,20 @@ export const DEFAULT_ITEMS = [
   {"id":"power-5","cat":"power","order":5,"name":"פנס נטען","note":"גיבוי לשעות שהגנרטור כבוי"},
   {"id":"power-6","cat":"power","order":6,"name":"רמקול בלוטות׳","note":"טעון"}
 ];
+
+// "כל אחד לעצמו": הרשימה ההתחלתית של מה שכל אחד אורז לעצמו. גם היא נטענת למסד פעם אחת בלבד.
+// המזהים זהים לאלה של הגרסה הקודמת, כדי שסימונים ששמורים כבר בטלפונים יישארו.
+export const DEFAULT_PERSONAL = [
+  { id: "me-tent", order: 1, name: "אוהל, יתדות ופטיש" },
+  { id: "me-bag", order: 2, name: "שק שינה" },
+  { id: "me-mat", order: 3, name: "מזרן או מזרון מתנפח (+ משאבה)" },
+  { id: "me-pillow", order: 4, name: "כרית" },
+  { id: "me-headlamp", order: 5, name: "פנס ראש" },
+  { id: "me-warm", order: 6, name: "ביגוד חם ללילה" },
+  { id: "me-towel", order: 7, name: "מגבת וכלי רחצה" },
+  { id: "me-flipflops", order: 8, name: "כפכפים" },
+  { id: "me-sun", order: 9, name: "כובע וקרם הגנה" },
+  { id: "me-spray", order: 10, name: "ספריי נגד יתושים" },
+  { id: "me-charger", order: 11, name: "מטען וכבל לטלפון" },
+  { id: "me-meds", order: 12, name: "תרופות אישיות" }
+];

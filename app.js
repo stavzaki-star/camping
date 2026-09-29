@@ -1,5 +1,5 @@
 import { firebaseConfig } from "./config.js";
-import { DEFAULT_ITEMS } from "./items.js";
+import { DEFAULT_ITEMS, DEFAULT_PERSONAL } from "./items.js";
 
 const SDK = "https://www.gstatic.com/firebasejs/12.19.0/";
 
@@ -52,6 +52,12 @@ const toastEl = $("toast");
 const copyPanel = $("copyPanel");
 const copyText = $("copyText");
 const copyClose = $("copyClose");
+const personalSec = $("personal");
+const pEditBtn = $("pEditBtn");
+const pStateEl = $("pState");
+const plistEl = $("plist");
+const paddForm = $("padd");
+const paddName = $("paddName");
 
 // Per-device conveniences only (remembered filter, personal ticks).
 const local = {
@@ -433,7 +439,7 @@ function showProblem(msg) {
 
 /* ---------- writing ---------- */
 
-function enqueue(key, job) {
+function enqueue(key, job, onError = onWriteError) {
   const prev = queues.get(key) || Promise.resolve();
   const run = prev.catch(() => {}).then(job);
   queues.set(key, run);
@@ -444,7 +450,7 @@ function enqueue(key, job) {
     clearTimeout(flashTimer);
     flashTimer = setTimeout(() => { state.savedFlash = false; renderSync(); }, 1600);
   }, (err) => {
-    onWriteError(err, key);
+    onError(err, key);
   }).then(() => {
     state.pending--;
     if (queues.get(key) === run) queues.delete(key);
@@ -596,19 +602,184 @@ copyClose.addEventListener("click", () => {
 window.addEventListener("online", renderSync);
 window.addEventListener("offline", renderSync);
 
-/* ---------- personal list (this device only) ---------- */
+/* ---------- personal list: shared names, ticks on this device only ---------- */
 
-function wirePersonal() {
-  const key = "camping.personal.v1";
-  const saved = local.get(key, []);
-  const checked = new Set(Array.isArray(saved) ? saved : []);
-  for (const cb of document.querySelectorAll(".plist input[type=checkbox]")) {
-    cb.checked = checked.has(cb.id);
-    cb.addEventListener("change", () => {
-      if (cb.checked) checked.add(cb.id); else checked.delete(cb.id);
-      local.set(key, Array.from(checked));
-    });
+const TICKS_KEY = "camping.personal.v1";
+const savedTicks = local.get(TICKS_KEY, []);
+const ticks = new Set(Array.isArray(savedTicks) ? savedTicks : []);
+const personal = { items: [], loaded: false, editing: false, editable: false };
+
+function normPersonal(id, d) {
+  d = d || {};
+  return {
+    id,
+    name: typeof d.name === "string" && d.name.trim() ? d.name : "פריט",
+    order: typeof d.order === "number" && isFinite(d.order) ? d.order : 9999
+  };
+}
+
+function createPersonalRow(it) {
+  const li = document.createElement("li");
+  li.dataset.key = it.id;
+  const label = document.createElement("label");
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.id = "pc-" + it.id;
+  const span = document.createElement("span");
+  label.append(cb, span);
+  const nameIn = document.createElement("input");
+  nameIn.className = "field pname-in";
+  nameIn.type = "text";
+  nameIn.maxLength = 60;
+  nameIn.autocomplete = "off";
+  nameIn.id = "pn-" + it.id;
+  nameIn.setAttribute("aria-label", "שם הפריט");
+  const del = document.createElement("button");
+  del.type = "button";
+  del.className = "pdel";
+  del.textContent = "מחיקה";
+  li.append(label, nameIn, del);
+  return li;
+}
+
+function updatePersonalRow(li, it) {
+  const span = li.querySelector("label span");
+  if (span.textContent !== it.name) span.textContent = it.name;
+  li.querySelector("input[type=checkbox]").checked = ticks.has(it.id);
+  const nameIn = li.querySelector(".pname-in");
+  if (document.activeElement !== nameIn && nameIn.value !== it.name) nameIn.value = it.name;
+  li.querySelector(".pdel").setAttribute("aria-label", "מחיקה: " + it.name);
+}
+
+function renderPersonal() {
+  const editing = personal.editing && personal.editable;
+  pEditBtn.hidden = !personal.editable;
+  pEditBtn.textContent = editing ? "סיום עריכה" : "עריכה";
+  pEditBtn.setAttribute("aria-pressed", String(editing));
+  personalSec.classList.toggle("p-editing", editing);
+
+  const list = personal.items.slice().sort((a, b) => (a.order - b.order) || a.name.localeCompare(b.name, "he"));
+  if (!personal.loaded) {
+    pStateEl.hidden = false;
+    pStateEl.textContent = "טוען…";
+  } else if (!list.length && !editing) {
+    pStateEl.hidden = false;
+    pStateEl.textContent = personal.editable ? "הרשימה ריקה. לחצו על ״עריכה״ כדי להוסיף פריט." : "הרשימה ריקה.";
+  } else {
+    pStateEl.hidden = true;
   }
+
+  const existing = new Map();
+  for (const el of plistEl.children) existing.set(el.dataset.key, el);
+  let cursor = plistEl.firstElementChild;
+  for (const it of list) {
+    let el = existing.get(it.id);
+    if (el) existing.delete(it.id);
+    else el = createPersonalRow(it);
+    updatePersonalRow(el, it);
+    if (el === cursor) cursor = cursor.nextElementSibling;
+    else plistEl.insertBefore(el, cursor);
+  }
+  for (const el of existing.values()) el.remove();
+}
+
+// Without the database (no rules yet, no connection) the starting list still shows, just not editable.
+function personalFallback() {
+  if (personal.loaded) return;
+  personal.items = DEFAULT_PERSONAL.map((p) => normPersonal(p.id, p));
+  personal.loaded = true;
+  personal.editable = false;
+  personal.editing = false;
+  renderPersonal();
+}
+
+function onPersonalWriteError(err) {
+  const code = err && err.code;
+  if (code === "permission-denied") toast("השינוי ברשימה האישית נחסם ולא נשמר. ספרו לסתיו.");
+  else if (code === "resource-exhausted") toast("נגמרה המכסה היומית של מסד הנתונים. נסו שוב מחר.");
+  else if (code !== "not-found") toast("השינוי לא נשמר. נסו שוב.");
+}
+
+pEditBtn.addEventListener("click", () => {
+  if (!personal.editable) return;
+  personal.editing = !personal.editing;
+  renderPersonal();
+});
+
+plistEl.addEventListener("change", (e) => {
+  const t = e.target;
+  const li = t.closest("li");
+  if (!li) return;
+  const id = li.dataset.key;
+  if (t.type === "checkbox") {
+    if (t.checked) ticks.add(id); else ticks.delete(id);
+    local.set(TICKS_KEY, Array.from(ticks));
+    return;
+  }
+  if (!t.classList.contains("pname-in") || !api || !personal.editable) return;
+  const it = personal.items.find((x) => x.id === id);
+  if (!it) return;
+  const name = t.value.trim().slice(0, 60);
+  if (!name) { t.value = it.name; return; }
+  if (name === it.name) return;
+  it.name = name;
+  renderPersonal();
+  enqueue("p:" + id, () => api.updatePersonal(id, { name }), onPersonalWriteError);
+});
+
+plistEl.addEventListener("click", (e) => {
+  const btn = e.target.closest(".pdel");
+  if (!btn || !api || !personal.editable) return;
+  const id = btn.closest("li").dataset.key;
+  if (btn.dataset.armed !== "1") {
+    btn.dataset.armed = "1";
+    btn.textContent = "למחוק?";
+    clearTimeout(btn._disarm);
+    btn._disarm = setTimeout(() => { btn.dataset.armed = ""; btn.textContent = "מחיקה"; }, 3000);
+    return;
+  }
+  clearTimeout(btn._disarm);
+  personal.items = personal.items.filter((x) => x.id !== id);
+  if (ticks.delete(id)) local.set(TICKS_KEY, Array.from(ticks));
+  renderPersonal();
+  enqueue("p:" + id, () => api.removePersonal(id), onPersonalWriteError);
+});
+
+paddForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  if (!api || !personal.editable) return;
+  const name = paddName.value.trim().slice(0, 60);
+  if (!name) { paddName.focus(); return; }
+  const order = personal.items.reduce((m, x) => Math.max(m, x.order), 0) + 1;
+  const id = api.newPersonalId();
+  personal.items.push(normPersonal(id, { name, order }));
+  renderPersonal();
+  paddName.value = "";
+  paddName.focus();
+  enqueue("p:" + id, () => api.createPersonal(id, { name, order }), onPersonalWriteError);
+});
+
+function startPersonal() {
+  let seedTried = false;
+  api.watchPersonal((snap) => {
+    // An empty answer from the phone's cache says nothing yet; wait for the server.
+    if (snap.empty && snap.fromCache && !personal.loaded) return;
+    personal.items = snap.items;
+    personal.loaded = true;
+    personal.editable = true;
+    renderPersonal();
+    if (snap.empty && !snap.fromCache && !seedTried) {
+      seedTried = true;
+      api.seedPersonal(DEFAULT_PERSONAL).catch(() => {});
+    }
+  }, () => {
+    // Keep whatever already loaded; only fall back to the starting list if nothing did.
+    personal.editable = false;
+    personal.editing = false;
+    if (personal.loaded) renderPersonal();
+    else personalFallback();
+  });
+  setTimeout(() => { if (!personal.loaded) personalFallback(); }, 10000);
 }
 
 /* ---------- Firebase ---------- */
@@ -616,6 +787,8 @@ function wirePersonal() {
 function makeApi(F, db) {
   const itemsCol = F.collection(db, "items");
   const itemRef = (id) => F.doc(db, "items", id);
+  const personalCol = F.collection(db, "personal");
+  const personalRef = (id) => F.doc(db, "personal", id);
   return {
     watch(next, fail) {
       return F.onSnapshot(itemsCol, { includeMetadataChanges: true }, (qs) => next({
@@ -631,6 +804,27 @@ function makeApi(F, db) {
     async get(id) {
       const snap = await F.getDoc(itemRef(id));
       return snap.exists() ? normalize(id, snap.data()) : null;
+    },
+    watchPersonal(next, fail) {
+      return F.onSnapshot(personalCol, { includeMetadataChanges: true }, (qs) => next({
+        items: qs.docs.map((d) => normPersonal(d.id, d.data())),
+        fromCache: qs.metadata.fromCache,
+        empty: qs.empty
+      }), fail);
+    },
+    updatePersonal: (id, patch) => F.updateDoc(personalRef(id), patch),
+    removePersonal: (id) => F.deleteDoc(personalRef(id)),
+    createPersonal: (id, data) => F.setDoc(personalRef(id), data),
+    newPersonalId: () => F.doc(personalCol).id,
+    seedPersonal(items) {
+      const metaRef = F.doc(db, "meta", "seedPersonal");
+      return F.runTransaction(db, async (tx) => {
+        const meta = await tx.get(metaRef);
+        if (meta.exists()) return false;
+        for (const it of items) tx.set(personalRef(it.id), { name: it.name, order: it.order });
+        tx.set(metaRef, { seededAt: F.serverTimestamp(), count: items.length });
+        return true;
+      });
     },
     // Loads the starting list exactly once, even if several people open the page at the same moment.
     seed(items) {
@@ -669,6 +863,7 @@ async function connect() {
     tallyEl.textContent = "חסרות הגדרות";
     showProblem("צריך להדביק את firebaseConfig בקובץ config.js.");
     renderSync();
+    personalFallback();
     return;
   }
 
@@ -680,6 +875,7 @@ async function connect() {
     skel.hidden = true;
     listStateText.textContent = "לא הצלחתי לטעון את הרשימה. בדקו את החיבור ורעננו את הדף.";
     renderSync();
+    personalFallback();
     return;
   }
 
@@ -694,6 +890,7 @@ async function connect() {
     db = fsMod.getFirestore(fbApp);
   }
   api = makeApi(fsMod, db);
+  startPersonal();
 
   let seedTried = false;
   setTimeout(() => {
@@ -718,6 +915,6 @@ async function connect() {
 
 buildChips();
 buildSections();
-wirePersonal();
+renderPersonal();
 renderSync();
 connect();
