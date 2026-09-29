@@ -64,7 +64,7 @@ const local = {
   }
 };
 
-const savedFilter = local.get("gidona.filter", "all");
+const savedFilter = local.get("camping.filter", "all");
 const state = {
   items: [],
   loaded: false,
@@ -404,7 +404,7 @@ function pageUrl() {
 function summary(short) {
   const items = sortItems(state.items);
   const line = (it) => `${it.done ? "✓" : "•"} ${it.name}${it.note && !short ? ` (${it.note})` : ""}`;
-  const out = ["*קמפינג בגדעונה: מי מביא מה*"];
+  const out = ["*קמפינג: מי מביא מה*"];
   for (const p of [...PEOPLE, { id: "all", name: "כל אחד מביא לעצמו" }]) {
     const mine = items.filter((it) => it.who === p.id);
     if (!mine.length) continue;
@@ -559,7 +559,7 @@ chipsEl.addEventListener("click", (e) => {
   if (!b || state.editing) return;
   const f = b.dataset.f;
   state.filter = state.filter === f && f !== "all" ? "all" : f;
-  local.set("gidona.filter", state.filter);
+  local.set("camping.filter", state.filter);
   render();
   const anchorTop = filtersAnchor.getBoundingClientRect().top + window.scrollY;
   if (window.scrollY > anchorTop) window.scrollTo({ top: anchorTop, behavior: reduceMotion ? "auto" : "smooth" });
@@ -599,7 +599,7 @@ window.addEventListener("offline", renderSync);
 /* ---------- personal list (this device only) ---------- */
 
 function wirePersonal() {
-  const key = "gidona.personal.v1";
+  const key = "camping.personal.v1";
   const saved = local.get(key, []);
   const checked = new Set(Array.isArray(saved) ? saved : []);
   for (const cb of document.querySelectorAll(".plist input[type=checkbox]")) {
