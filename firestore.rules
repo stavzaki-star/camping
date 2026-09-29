@@ -1,0 +1,31 @@
+rules_version = '2';
+
+// Anyone with the page link can read and edit the list, no sign-in.
+// The rules only make sure every item keeps the right shape, and nothing else can be written.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function validItem(d) {
+      return d.keys().hasOnly(['name', 'note', 'cat', 'order', 'who', 'done'])
+        && d.keys().hasAll(['name', 'note', 'cat', 'order', 'who', 'done'])
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 60
+        && d.note is string && d.note.size() <= 80
+        && d.cat in ['meat', 'grill', 'kitchen', 'sides', 'drinks', 'morning', 'disposable', 'camp', 'power', 'other']
+        && d.order is number
+        && (d.who == null || d.who in ['stav', 'shlomi', 'reshef', 'sapir', 'all'])
+        && d.done is bool;
+    }
+
+    match /items/{itemId} {
+      allow read: if true;
+      allow create, update: if validItem(request.resource.data);
+      allow delete: if true;
+    }
+
+    // One-time marker: the starting list was loaded, so it is never loaded again.
+    match /meta/seed {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasOnly(['seededAt', 'count']);
+    }
+  }
+}

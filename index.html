@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>קמפינג בגדעונה</title>
+<meta name="description" content="מי מביא מה לקמפינג בגדעונה: בוחרים ליד כל פריט מי מביא אותו, והרשימה מתעדכנת אצל כולם.">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="he_IL">
+<meta property="og:title" content="קמפינג בגדעונה">
+<meta property="og:description" content="מי מביא מה: בוחרים ליד כל פריט מי מביא אותו, והרשימה מתעדכנת אצל כולם.">
+<meta property="og:url" content="https://stavzaki-star.github.io/capming-gidona/">
+<meta property="og:image" content="https://stavzaki-star.github.io/capming-gidona/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="קמפינג בגדעונה: מי מביא מה">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#E8E7DD" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#13150F" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231F2219'/%3E%3Cpath d='M16 6 27.5 25h-23z' fill='%23E8E7DD'/%3E%3Cpath d='M16 14.5 20.2 25h-8.4z' fill='%231F2219'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Hebrew:wght@400;500;600;700&family=Karantina:wght@400;700&family=Playpen+Sans+Hebrew:wght@500;700&display=swap">
+<style>
+/* Layout: one narrow column that reads like a quartermaster's sign-out sheet: title, a live tally, sticky name filters, then ruled sections whose left edge is the "who brings it" signature column. */
+:root {
+  --paper: #E8E7DD;
+  --sheet: #F7F7F1;
+  --ink: #1F2219;
+  --ink-soft: #565A4A;
+  --ink-faint: #7F8272;
+  --rule: #D8D7CA;
+  --rule-strong: #8E8E7C;
+  --on-ink: #F7F7F1;
+  --p-stav: #8C5210;
+  --p-shlomi: #3D6F27;
+  --p-reshef: #B3341E;
+  --p-sapir: #2853A0;
+  --danger: #B3261E;
+  --font-display: "Karantina", "Arial Narrow", Arial, sans-serif;
+  --font-body: "IBM Plex Sans Hebrew", "Segoe UI", "Arial Hebrew", Arial, sans-serif;
+  --font-sign: "Playpen Sans Hebrew", "Segoe Print", "Comic Sans MS", cursive;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #13150F;
+    --sheet: #1B1E16;
+    --ink: #E9E8DC;
+    --ink-soft: #A9AB99;
+    --ink-faint: #7C7F6E;
+    --rule: #2C3024;
+    --rule-strong: #6A6E60;
+    --on-ink: #13150F;
+    --p-stav: #E2A451;
+    --p-shlomi: #96C26F;
+    --p-reshef: #F1816B;
+    --p-sapir: #88ACEF;
+    --danger: #FF8F85;
+    color-scheme: dark;
+  }
+}
+
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 16px/1.5 var(--font-body);
+}
+[hidden] { display: none !important; }
+.page {
+  max-width: 44rem;
+  margin-inline: auto;
+  padding-inline: 16px;
+  padding-block: 28px 72px;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+
+/* Header */
+.top { display: grid; gap: 4px; }
+.eyebrow { margin: 0; font-weight: 600; font-size: .8rem; letter-spacing: .05em; color: var(--ink-soft); }
+h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(3.6rem, 17vw, 5.6rem);
+  line-height: .88;
+  text-wrap: balance;
+}
+.lede { margin: 10px 0 0; max-width: 34em; color: var(--ink-soft); text-wrap: pretty; }
+.ridge { display: block; width: 100%; height: 30px; margin-block-start: 14px; color: var(--rule-strong); }
+
+/* Tally */
+.tally { display: grid; gap: 8px; margin-block: 16px 4px; }
+.tally-top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.tally-num { font-weight: 600; font-variant-numeric: tabular-nums; }
+.sync { display: inline-flex; align-items: center; gap: 7px; font-size: .82rem; color: var(--ink-soft); }
+.sync::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--ink-faint); box-sizing: border-box; }
+.sync[data-state="live"]::before { background: var(--ink); border-color: var(--ink); }
+.sync[data-state="saving"]::before { border-color: var(--ink); border-inline-end-color: transparent; animation: spin .8s linear infinite; }
+.sync[data-state="off"]::before { border-color: var(--danger); background: var(--danger); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.meter { display: flex; gap: 2px; height: 10px; }
+.meter:empty { background: var(--rule); border-radius: 999px; }
+.seg { min-width: 4px; border-radius: 2px; }
+.seg:first-child { border-start-start-radius: 999px; border-end-start-radius: 999px; }
+.seg:last-child { border-start-end-radius: 999px; border-end-end-radius: 999px; }
+.seg-stav { background: var(--p-stav); }
+.seg-shlomi { background: var(--p-shlomi); }
+.seg-reshef { background: var(--p-reshef); }
+.seg-sapir { background: var(--p-sapir); }
+.seg-all { background: var(--ink-soft); }
+.seg-none { background: repeating-linear-gradient(135deg, var(--rule-strong) 0 2px, transparent 2px 6px); box-shadow: inset 0 0 0 1px var(--rule-strong); }
+
+/* Sticky filters */
+.filters {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin-inline: -16px;
+  padding: 12px 16px;
+  background: var(--paper);
+}
+.chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-block: 2px;
+  margin-block: -2px;
+}
+.chips::-webkit-scrollbar { display: none; }
+.chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding-inline: 13px;
+  border-radius: 999px;
+  border: 1px solid var(--rule-strong);
+  background: var(--sheet);
+  color: var(--ink);
+  font-weight: 500;
+  font-size: .9rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.chip .n { font-variant-numeric: tabular-nums; color: var(--ink-soft); font-size: .85rem; }
+.chip .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c); }
+.chip.person .lbl { font-family: var(--font-sign); font-weight: 700; font-size: .98rem; }
+.chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
+.chip[aria-pressed="true"] .n { color: inherit; opacity: .78; }
+.chip[aria-pressed="true"] .dot { box-shadow: 0 0 0 2px var(--on-ink); }
+.chip:disabled { opacity: .45; cursor: default; }
+
+[data-f="stav"], [data-who="stav"] { --c: var(--p-stav); }
+[data-f="shlomi"], [data-who="shlomi"] { --c: var(--p-shlomi); }
+[data-f="reshef"], [data-who="reshef"] { --c: var(--p-reshef); }
+[data-f="sapir"], [data-who="sapir"] { --c: var(--p-sapir); }
+[data-who="all"] { --c: var(--ink-soft); }
+
+/* Actions */
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-block: 4px 16px; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding-inline: 16px;
+  border-radius: 999px;
+  border: 1.5px solid var(--ink);
+  background: var(--ink);
+  color: var(--on-ink);
+  font-weight: 600;
+  font-size: .95rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+.btn.ghost { background: transparent; color: var(--ink); }
+.btn.ghost[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
+.btn.small { min-height: 40px; padding-inline: 14px; font-size: .9rem; }
+.edit-hint { margin: -6px 0 16px; font-size: .88rem; color: var(--ink-soft); }
+.notice {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px dashed var(--danger);
+  background: var(--sheet);
+  color: var(--ink);
+  font-size: .92rem;
+}
+
+:where(.btn, .chip, .tick, .del, .field, .who, .plist input):focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* States */
+.state {
+  padding: 22px 16px;
+  border-radius: 14px;
+  border: 1px dashed var(--rule-strong);
+  color: var(--ink-soft);
+  text-align: center;
+}
+.state p { margin: 0; }
+.skel { display: grid; gap: 12px; margin-block-start: 16px; }
+.skel span { height: 12px; border-radius: 6px; background: var(--rule); }
+.skel span:nth-child(2) { width: 82%; }
+.skel span:nth-child(3) { width: 64%; }
+
+/* Sections */
+.cats { display: grid; gap: 14px; }
+.cat {
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  padding-inline: 16px;
+  padding-block: 14px 4px;
+}
+.cat-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.cat h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 2.15rem;
+  line-height: 1;
+}
+.cnt { font-size: .82rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cat-hint { margin: 2px 0 0; font-size: .86rem; color: var(--ink-soft); }
+.rows { list-style: none; margin: 8px 0 0; padding: 0; }
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 60px;
+  padding-block: 8px;
+  border-block-start: 1px solid var(--rule);
+}
+.txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.nm { font-weight: 500; line-height: 1.3; overflow-wrap: anywhere; }
+.nt { font-size: .85rem; line-height: 1.35; color: var(--ink-soft); overflow-wrap: anywhere; }
+.row[data-done="1"] .nm { color: var(--ink-soft); text-decoration: line-through; text-decoration-thickness: 1px; }
+
+.tick {
+  position: relative;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  margin-inline-start: -8px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+.tick::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--rule-strong);
+  background: var(--sheet);
+  transition: background-color .15s, border-color .15s;
+}
+.tick::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 9px;
+  height: 5px;
+  border-left: 2px solid var(--on-ink);
+  border-bottom: 2px solid var(--on-ink);
+  transform: translate(-50%, -70%) rotate(-45deg);
+  opacity: 0;
+}
+.row[data-done="1"] .tick::before { background: var(--c, var(--ink)); border-color: var(--c, var(--ink)); }
+.row[data-done="1"] .tick::after { opacity: 1; }
+
+.who-wrap { position: relative; flex: none; color: var(--ink-faint); }
+.row[data-who]:not([data-who=""]) .who-wrap { color: var(--c); }
+.who-wrap::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-70%) rotate(45deg);
+  pointer-events: none;
+}
+.who {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 7.6rem;
+  height: 42px;
+  margin: 0;
+  padding-block: 0;
+  padding-inline: 14px 30px;
+  border-radius: 999px;
+  border: 1.5px dashed var(--rule-strong);
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 1rem;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.row[data-who]:not([data-who=""]) .who {
+  border-style: solid;
+  border-color: var(--c);
+  color: var(--c);
+  background: var(--sheet);
+  background: color-mix(in srgb, var(--c) 12%, var(--sheet));
+}
+.row[data-who="stav"] .who,
+.row[data-who="shlomi"] .who,
+.row[data-who="reshef"] .who,
+.row[data-who="sapir"] .who { font-family: var(--font-sign); font-weight: 700; }
+.row[data-who="all"] .who { color: var(--ink); }
+
+/* Edit mode */
+.nm-in, .nt-in, .del { display: none; }
+.field {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 42px;
+  padding-inline: 10px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 1rem;
+}
+.field::placeholder { color: var(--ink-soft); }
+.editing .tick, .editing .who-wrap, .editing .nm, .editing .nt { display: none; }
+.editing .nm-in, .editing .nt-in { display: block; }
+.editing .txt { gap: 6px; }
+.editing .row { align-items: flex-start; padding-block: 12px; }
+.editing .del { display: inline-flex; }
+.del {
+  flex: none;
+  align-items: center;
+  height: 42px;
+  padding-inline: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--rule-strong);
+  background: transparent;
+  color: var(--ink-soft);
+  font-weight: 500;
+  font-size: .9rem;
+  cursor: pointer;
+}
+.del[data-armed="1"] { border-color: var(--danger); color: var(--danger); font-weight: 700; }
+.add {
+  display: none;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-block: 12px;
+  border-block-start: 1px dashed var(--rule-strong);
+}
+.editing .add { display: flex; }
+.add .field { flex: 1 1 9rem; width: auto; }
+
+/* Personal list */
+.personal { margin-block-start: 36px; }
+.personal h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 2.15rem;
+  line-height: 1;
+}
+.personal > p { margin: 6px 0 0; color: var(--ink-soft); font-size: .92rem; max-width: 36em; }
+.plist {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  column-gap: 20px;
+}
+.plist li { border-block-start: 1px solid var(--rule); }
+.plist label { display: flex; align-items: center; gap: 12px; min-height: 46px; cursor: pointer; }
+.plist input { flex: none; width: 20px; height: 20px; margin: 0; accent-color: var(--ink); }
+.plist input:checked + span { color: var(--ink-soft); text-decoration: line-through; text-decoration-thickness: 1px; }
+
+.foot { margin-block-start: 32px; padding-block-start: 14px; border-block-start: 1px solid var(--rule); font-size: .84rem; color: var(--ink-soft); }
+.foot p { margin: 0; }
+
+/* Overlays */
+.toast {
+  position: fixed;
+  z-index: 20;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 32px);
+  padding: 11px 16px;
+  border-radius: 12px;
+  background: var(--ink);
+  color: var(--on-ink);
+  font-size: .92rem;
+  box-shadow: 0 8px 28px rgb(0 0 0 / .2);
+}
+.copy-panel {
+  position: fixed;
+  z-index: 30;
+  inset-inline: 0;
+  bottom: 0;
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  background: var(--sheet);
+  border-top: 1px solid var(--rule-strong);
+  box-shadow: 0 -10px 30px rgb(0 0 0 / .18);
+}
+.copy-panel p { margin: 0; font-weight: 600; }
+.copy-panel textarea {
+  box-sizing: border-box;
+  width: 100%;
+  height: 38vh;
+  padding: 10px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.45;
+  resize: vertical;
+}
+.copy-panel .btn { justify-self: start; }
+
+@media (min-width: 640px) {
+  .page { padding-block-start: 44px; }
+  .row { gap: 12px; }
+  .who { width: 8.4rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tick::before { transition: none; }
+  .sync[data-state="saving"]::before { animation: none; }
+}
+</style>
+</head>
+<body>
+<main class="page" id="app">
+  <header class="top">
+    <p class="eyebrow">גדעונה · למרגלות הגלבוע</p>
+    <h1>קמפינג בגדעונה</h1>
+    <p class="lede">על האש ליד המעיין, ארבעה חבר׳ה. ליד כל פריט בוחרים מי מביא אותו, ומסמנים ✓ כשהוא כבר ארוז. כל שינוי מופיע מיד אצל כולם.</p>
+    <svg class="ridge" viewBox="0 0 640 30" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <path d="M0 27 C40 26 72 22 112 19 S172 10 216 9 S282 15 322 7 S392 3 432 8 S502 17 542 19 S612 25 640 26" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+    </svg>
+  </header>
+
+  <section class="tally" aria-label="מצב הרשימה">
+    <div class="tally-top">
+      <span class="tally-num" id="tallyText">טוען את הרשימה…</span>
+      <span class="sync" id="sync" data-state="wait" role="status" aria-live="polite">מתחבר…</span>
+    </div>
+    <div class="meter" id="meter" aria-hidden="true"></div>
+  </section>
+
+  <div id="filtersAnchor"></div>
+  <nav class="filters" id="filters" aria-label="סינון לפי מי מביא" hidden>
+    <div class="chips" id="chips"></div>
+  </nav>
+
+  <div class="actions" id="actions" hidden>
+    <button type="button" class="btn" id="copyBtn">העתקה לוואטסאפ</button>
+    <a class="btn ghost" id="waLink" href="https://wa.me/" target="_blank" rel="noopener noreferrer">שליחה בוואטסאפ</a>
+    <button type="button" class="btn ghost" id="editBtn" aria-pressed="false">עריכת הרשימה</button>
+  </div>
+  <p class="edit-hint" id="editHint" hidden>במצב עריכה משנים שם או כמות, מוחקים פריטים, ומוסיפים חדשים בתחתית כל קטגוריה.</p>
+  <p class="notice" id="notice" role="alert" hidden></p>
+
+  <div class="state" id="listState">
+    <p id="listStateText">טוען את הרשימה…</p>
+    <div class="skel" id="skel" aria-hidden="true"><span></span><span></span><span></span></div>
+  </div>
+  <div class="cats" id="cats"></div>
+
+  <section class="personal" aria-labelledby="personal-h">
+    <h2 id="personal-h">כל אחד לעצמו</h2>
+    <p>את אלה לא משבצים: כל אחד אורז לעצמו. הסימונים כאן נשמרים רק במכשיר שלך.</p>
+    <ul class="plist">
+      <li><label><input type="checkbox" id="me-tent"><span>אוהל, יתדות ופטיש</span></label></li>
+      <li><label><input type="checkbox" id="me-bag"><span>שק שינה</span></label></li>
+      <li><label><input type="checkbox" id="me-mat"><span>מזרן או מזרון מתנפח (+ משאבה)</span></label></li>
+      <li><label><input type="checkbox" id="me-pillow"><span>כרית</span></label></li>
+      <li><label><input type="checkbox" id="me-headlamp"><span>פנס ראש</span></label></li>
+      <li><label><input type="checkbox" id="me-warm"><span>ביגוד חם ללילה</span></label></li>
+      <li><label><input type="checkbox" id="me-towel"><span>מגבת וכלי רחצה</span></label></li>
+      <li><label><input type="checkbox" id="me-flipflops"><span>כפכפים</span></label></li>
+      <li><label><input type="checkbox" id="me-sun"><span>כובע וקרם הגנה</span></label></li>
+      <li><label><input type="checkbox" id="me-spray"><span>ספריי נגד יתושים</span></label></li>
+      <li><label><input type="checkbox" id="me-charger"><span>מטען וכבל לטלפון</span></label></li>
+      <li><label><input type="checkbox" id="me-meds"><span>תרופות אישיות</span></label></li>
+    </ul>
+  </section>
+
+  <footer class="foot">
+    <p>סתיו, שלומי, רשף וספיר. כל מי שיש לו את הקישור יכול לערוך, אז הוא נשאר בקבוצה.</p>
+  </footer>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<div class="copy-panel" id="copyPanel" role="dialog" aria-labelledby="copyPanelTitle" hidden>
+  <p id="copyPanelTitle">ההעתקה האוטומטית לא עבדה. סמנו את הטקסט והעתיקו ידנית:</p>
+  <textarea id="copyText" readonly></textarea>
+  <button type="button" class="btn small" id="copyClose">סגירה</button>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
