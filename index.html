@@ -440,7 +440,8 @@ h1 {
 
 /* Personal list: shared list of names, ticks kept on each device */
 .personal { margin-block-start: 36px; }
-.personal-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.personal-h { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.personal-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .personal h2 {
   margin: 0;
   font-family: var(--font-display);
@@ -575,7 +576,10 @@ h1 {
   <section class="personal" id="personal" aria-labelledby="personal-h">
     <div class="personal-h">
       <h2 id="personal-h">כל אחד לעצמו</h2>
-      <button type="button" class="btn ghost tiny" id="pEditBtn" aria-pressed="false" hidden>עריכה</button>
+      <div class="personal-actions">
+        <a class="btn ghost tiny" id="pWaLink" href="https://wa.me/" target="_blank" rel="noopener noreferrer" hidden>שליחה בוואטסאפ</a>
+        <button type="button" class="btn ghost tiny" id="pEditBtn" aria-pressed="false" hidden>עריכה</button>
+      </div>
     </div>
     <p class="personal-note">את אלה לא משבצים: כל אחד אורז לעצמו. הרשימה משותפת לכולם, והסימונים ✓ נשמרים רק במכשיר שלך.</p>
     <p class="pstate" id="pState">טוען…</p>

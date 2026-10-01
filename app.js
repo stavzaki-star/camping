@@ -57,6 +57,7 @@ const copyText = $("copyText");
 const copyClose = $("copyClose");
 const personalSec = $("personal");
 const pEditBtn = $("pEditBtn");
+const pWaLink = $("pWaLink");
 const pStateEl = $("pState");
 const plistEl = $("plist");
 const paddForm = $("padd");
@@ -520,6 +521,19 @@ function summaryByPerson() {
   return withLink(["*קמפינג: מי מביא מה*", ...out]);
 }
 
+// The "כל אחד לעצמו" names in list order (the starting list if the database is not available).
+function personalSorted() {
+  return (personal.loaded ? personal.items : DEFAULT_PERSONAL.map((p) => normPersonal(p.id, p)))
+    .slice().sort((a, b) => (a.order - b.order) || a.name.localeCompare(b.name, "he"));
+}
+
+// Just the "כל אחד לעצמו" list, for its own WhatsApp button.
+function summaryPersonal() {
+  const own = personalSorted();
+  if (!own.length) return null;
+  return withLink(["*קמפינג: כל אחד לעצמו*", "", ...own.map((p) => `• ${p.name}`)]);
+}
+
 // The whole list by topic, who brings each item, and the "כל אחד לעצמו" list.
 function summaryByTopic() {
   const items = sortItems(state.items);
@@ -529,8 +543,7 @@ function summaryByTopic() {
     if (!list.length) continue;
     out.push("", `*${cat.name}*`, ...list.map((it) => `${itemLine(it)} – ${it.who.length ? whoText(it.who) : "פנוי"}`));
   }
-  const own = (personal.loaded ? personal.items : DEFAULT_PERSONAL.map((p) => normPersonal(p.id, p)))
-    .slice().sort((a, b) => (a.order - b.order) || a.name.localeCompare(b.name, "he"));
+  const own = personalSorted();
   if (own.length) out.push("", "*כל אחד לעצמו*", ...own.map((p) => `• ${p.name}`));
   return withLink(out);
 }
@@ -720,10 +733,10 @@ copyBtn.addEventListener("click", () => {
 // Very long texts can fail as a link, so they go through the phone's share menu, or get copied on a computer.
 const WA_MAX_URL = 6000;
 const isTouch = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
-function wireWhatsAppLink(link, build) {
+function wireWhatsAppLink(link, build, emptyMessage = EMPTY_SELECTION_MSG) {
   link.addEventListener("click", (e) => {
     const text = build();
-    if (!text) { e.preventDefault(); toast(EMPTY_SELECTION_MSG); return; }
+    if (!text) { e.preventDefault(); toast(emptyMessage); return; }
     const url = "https://wa.me/?text=" + encodeURIComponent(text);
     if (url.length <= WA_MAX_URL) { link.href = url; return; }
     e.preventDefault();
@@ -733,6 +746,7 @@ function wireWhatsAppLink(link, build) {
 }
 wireWhatsAppLink(waLink, summaryByPerson);
 wireWhatsAppLink(waAllLink, summaryByTopic);
+wireWhatsAppLink(pWaLink, summaryPersonal, "אין מה לשלוח: הרשימה ריקה.");
 
 copyClose.addEventListener("click", () => {
   copyPanel.hidden = true;
@@ -885,6 +899,7 @@ function renderPersonal() {
   personalSec.classList.toggle("p-editing", editing);
 
   const list = personal.items.slice().sort((a, b) => (a.order - b.order) || a.name.localeCompare(b.name, "he"));
+  pWaLink.hidden = !personal.loaded || !list.length || editing;
   if (!personal.loaded) {
     pStateEl.hidden = false;
     pStateEl.textContent = "טוען…";
