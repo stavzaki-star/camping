@@ -485,25 +485,32 @@ function withLink(out) {
   return out.join("\n");
 }
 
-// "Who brings what", grouped by person. A shared item shows under each of its people
-// ("– עם רשף"); items all four bring go once under "כולם". With names selected, only their
-// part; with "פנויים" selected, the unassigned items. Returns null when there is nothing to send.
+// "Who brings what", grouped by the exact set of people on each item: "סתיו", then shared
+// groups such as "שלומי ורשף", then "כולם", then what is still free. With names selected, only
+// the groups that include one of them; with "פנויים" selected, the unassigned items.
+// Returns null when there is nothing to send.
 function summaryByPerson() {
   const items = sortItems(state.items);
   const sel = effectiveSelection();
-  const people = sel.size ? selectedPeople(sel) : PEOPLE;
-  const out = [];
-  const partners = (it, pid) => {
-    const others = it.who.filter((id) => id !== pid);
-    return others.length ? ` – עם ${joinNames(others.map((id) => NAME_OF[id]))}` : "";
-  };
-  for (const p of people) {
-    const mine = items.filter((it) => it.who.includes(p.id) && !isEveryone(it.who));
-    if (mine.length) out.push("", `*${p.name}* (${mine.length})`, ...mine.map((it) => itemLine(it) + partners(it, p.id)));
+  const groups = new Map();
+  for (const it of items) {
+    if (!it.who.length) continue;
+    if (sel.size && !it.who.some((id) => sel.has(id))) continue;
+    const key = it.who.join(",");
+    if (!groups.has(key)) groups.set(key, { ids: it.who, items: [] });
+    groups.get(key).items.push(it);
   }
-  if (!sel.size || people.length) {
-    const everyone = items.filter((it) => isEveryone(it.who));
-    if (everyone.length) out.push("", `*כולם* (${everyone.length})`, ...everyone.map(itemLine));
+  const byPeople = (a, b) => {
+    if (a.ids.length !== b.ids.length) return a.ids.length - b.ids.length;
+    for (let i = 0; i < a.ids.length; i++) {
+      const d = PEOPLE_IDS.indexOf(a.ids[i]) - PEOPLE_IDS.indexOf(b.ids[i]);
+      if (d) return d;
+    }
+    return 0;
+  };
+  const out = [];
+  for (const g of [...groups.values()].sort(byPeople)) {
+    out.push("", `*${whoText(g.ids)}* (${g.items.length})`, ...g.items.map(itemLine));
   }
   if (!sel.size || sel.has("none")) {
     const free = items.filter((it) => !it.who.length);
