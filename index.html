@@ -110,7 +110,7 @@ h1 {
 .seg-shlomi { background: var(--p-shlomi); }
 .seg-reshef { background: var(--p-reshef); }
 .seg-sapir { background: var(--p-sapir); }
-.seg-all { background: var(--ink-soft); }
+.seg-multi { background: var(--ink-soft); }
 .seg-none { background: repeating-linear-gradient(135deg, var(--rule-strong) 0 2px, transparent 2px 6px); box-shadow: inset 0 0 0 1px var(--rule-strong); }
 
 /* Sticky filters */
@@ -152,11 +152,11 @@ h1 {
 .chip[aria-pressed="true"] .dot { box-shadow: 0 0 0 2px var(--on-ink); }
 .chip:disabled { opacity: .45; cursor: default; }
 
-[data-f="stav"], [data-who="stav"] { --c: var(--p-stav); }
-[data-f="shlomi"], [data-who="shlomi"] { --c: var(--p-shlomi); }
-[data-f="reshef"], [data-who="reshef"] { --c: var(--p-reshef); }
-[data-f="sapir"], [data-who="sapir"] { --c: var(--p-sapir); }
-[data-who="all"] { --c: var(--ink-soft); }
+[data-f="stav"], [data-who="stav"], [data-p="stav"] { --c: var(--p-stav); }
+[data-f="shlomi"], [data-who="shlomi"], [data-p="shlomi"] { --c: var(--p-shlomi); }
+[data-f="reshef"], [data-who="reshef"], [data-p="reshef"] { --c: var(--p-reshef); }
+[data-f="sapir"], [data-who="sapir"], [data-p="sapir"] { --c: var(--p-sapir); }
+[data-who="multi"] { --c: var(--ink-soft); }
 
 /* Actions */
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-block: 4px 16px; }
@@ -189,7 +189,7 @@ h1 {
   font-size: .92rem;
 }
 
-:where(.btn, .chip, .tick, .del, .pdel, .field, .who, .plist input):focus-visible {
+:where(.btn, .chip, .tick, .del, .pdel, .field, .who, .who-opt, .plist input):focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
@@ -294,11 +294,15 @@ h1 {
 .who {
   -webkit-appearance: none;
   appearance: none;
-  display: block;
-  width: 7.6rem;
-  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  min-width: 7.6rem;
+  max-width: 11.5rem;
+  min-height: 42px;
   margin: 0;
-  padding-block: 0;
+  padding-block: 4px;
   padding-inline: 14px 30px;
   border-radius: 999px;
   border: 1.5px dashed var(--rule-strong);
@@ -307,9 +311,14 @@ h1 {
   font-family: var(--font-body);
   font-weight: 500;
   font-size: 1rem;
-  text-overflow: ellipsis;
+  line-height: 1.2;
+  text-align: start;
   cursor: pointer;
 }
+.who-lbl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.who .dots { display: inline-flex; gap: 3px; flex: none; }
+.who .dots:empty { display: none; }
+.who .dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
 .row[data-who]:not([data-who=""]) .who {
   border-style: solid;
   border-color: var(--c);
@@ -320,8 +329,70 @@ h1 {
 .row[data-who="stav"] .who,
 .row[data-who="shlomi"] .who,
 .row[data-who="reshef"] .who,
-.row[data-who="sapir"] .who { font-family: var(--font-sign); font-weight: 700; }
-.row[data-who="all"] .who { color: var(--ink); }
+.row[data-who="sapir"] .who,
+.row[data-who="multi"] .who { font-family: var(--font-sign); font-weight: 700; }
+.row[data-who="multi"] .who { color: var(--ink); font-size: .94rem; }
+
+/* "Who brings it" picker: a sheet with the four names, several can be on */
+.sheet-backdrop { position: fixed; inset: 0; z-index: 40; background: rgb(0 0 0 / .35); }
+.who-sheet {
+  position: fixed;
+  z-index: 41;
+  inset-inline: 0;
+  bottom: 0;
+  box-sizing: border-box;
+  max-width: 30rem;
+  margin-inline: auto;
+  display: grid;
+  gap: 12px;
+  padding: 18px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  background: var(--sheet);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -10px 30px rgb(0 0 0 / .22);
+}
+.who-sheet-title { margin: 0; font-size: .8rem; font-weight: 600; letter-spacing: .05em; color: var(--ink-soft); }
+.who-sheet-item { margin: -6px 0 2px; font-family: var(--font-display); font-weight: 700; font-size: 2.1rem; line-height: 1; overflow-wrap: anywhere; }
+.who-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.who-opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 54px;
+  padding-inline: 14px;
+  border-radius: 14px;
+  border: 1.5px solid var(--rule-strong);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sign);
+  font-weight: 700;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+.who-opt .dot { flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--c); }
+.who-opt .chk {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-inline-start: auto;
+  border-radius: 50%;
+  border: 1.5px solid var(--rule-strong);
+  box-sizing: border-box;
+}
+.who-opt[aria-pressed="true"] { border-color: var(--c); color: var(--c); background: var(--sheet); background: color-mix(in srgb, var(--c) 14%, var(--sheet)); }
+.who-opt[aria-pressed="true"] .chk { background: var(--c); border-color: var(--c); }
+.who-opt[aria-pressed="true"] .chk::after {
+  content: "";
+  width: 9px;
+  height: 5px;
+  border-left: 2px solid var(--on-ink);
+  border-bottom: 2px solid var(--on-ink);
+  transform: translateY(-1px) rotate(-45deg);
+}
+.who-sheet-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.who-sheet-actions .btn:disabled { opacity: .4; cursor: default; }
+#whoDone { margin-inline-start: auto; }
 
 /* Edit mode */
 .nm-in, .nt-in, .del { display: none; }
@@ -453,7 +524,7 @@ h1 {
 @media (min-width: 640px) {
   .page { padding-block-start: 44px; }
   .row { gap: 12px; }
-  .who { width: 8.4rem; }
+  .who { min-width: 8.4rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   .tick::before { transition: none; }
@@ -525,6 +596,18 @@ h1 {
   <p id="copyPanelTitle">ההעתקה האוטומטית לא עבדה. סמנו את הטקסט והעתיקו ידנית:</p>
   <textarea id="copyText" readonly></textarea>
   <button type="button" class="btn small" id="copyClose">סגירה</button>
+</div>
+
+<div class="sheet-backdrop" id="whoBackdrop" hidden></div>
+<div class="who-sheet" id="whoSheet" role="dialog" aria-modal="true" aria-labelledby="whoSheetTitle" hidden>
+  <p class="who-sheet-title" id="whoSheetTitle">מי מביא? אפשר לסמן כמה</p>
+  <p class="who-sheet-item" id="whoSheetItem"></p>
+  <div class="who-options" id="whoOptions"></div>
+  <div class="who-sheet-actions">
+    <button type="button" class="btn ghost small" id="whoAll">כולם</button>
+    <button type="button" class="btn ghost small" id="whoNone">אף אחד</button>
+    <button type="button" class="btn small" id="whoDone">סיום</button>
+  </div>
 </div>
 
 <script type="module" src="app.js"></script>

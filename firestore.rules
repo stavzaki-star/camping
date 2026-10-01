@@ -5,6 +5,16 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Who brings an item: nobody (null), one person (an id), or several people (a list of 2-4 ids).
+    // 'all' is the old "everyone" value, still accepted on existing items.
+    function validWho(w) {
+      return w == null
+        || (w is string && w in ['stav', 'shlomi', 'reshef', 'sapir', 'all'])
+        || (w is list && w.size() >= 2 && w.size() <= 4
+            && w.hasOnly(['stav', 'shlomi', 'reshef', 'sapir'])
+            && w.toSet().size() == w.size());
+    }
+
     function validItem(d) {
       return d.keys().hasOnly(['name', 'note', 'cat', 'order', 'who', 'done'])
         && d.keys().hasAll(['name', 'note', 'cat', 'order', 'who', 'done'])
@@ -12,7 +22,7 @@ service cloud.firestore {
         && d.note is string && d.note.size() <= 80
         && d.cat in ['meat', 'grill', 'kitchen', 'sides', 'drinks', 'morning', 'disposable', 'camp', 'power', 'other']
         && d.order is number
-        && (d.who == null || d.who in ['stav', 'shlomi', 'reshef', 'sapir', 'all'])
+        && validWho(d.who)
         && d.done is bool;
     }
 

@@ -9,7 +9,8 @@ const PEOPLE = [
   { id: "reshef", name: "רשף" },
   { id: "sapir", name: "ספיר" }
 ];
-const WHO_LABEL = { stav: "סתיו", shlomi: "שלומי", reshef: "רשף", sapir: "ספיר", all: "כל אחד" };
+const PEOPLE_IDS = PEOPLE.map((p) => p.id);
+const NAME_OF = Object.fromEntries(PEOPLE.map((p) => [p.id, p.name]));
 const CATS = [
   { id: "meat", name: "בשר", hint: "כמויות לערב אחד, ל-4" },
   { id: "grill", name: "מנגל ואש" },
@@ -104,7 +105,7 @@ function normalize(id, d) {
     note: typeof d.note === "string" ? d.note : "",
     cat: CAT_POS.has(d.cat) ? d.cat : "other",
     order: typeof d.order === "number" && isFinite(d.order) ? d.order : 9999,
-    who: Object.prototype.hasOwnProperty.call(WHO_LABEL, d.who) ? d.who : null,
+    who: normalizeWho(d.who),
     done: d.done === true
   };
 }
@@ -114,17 +115,35 @@ function sortItems(list) {
     (CAT_POS.get(a.cat) - CAT_POS.get(b.cat)) || (a.order - b.order) || a.name.localeCompare(b.name, "he"));
 }
 
+// Who brings an item. Stored as null (nobody), one id (one person) or a list of ids
+// (several people); "all" is the old "כל אחד" option and reads as all four.
+// In the page it is always a list of ids, in PEOPLE order.
+function normalizeWho(w) {
+  if (w === "all") return PEOPLE_IDS.slice();
+  const ids = Array.isArray(w) ? w : typeof w === "string" ? [w] : [];
+  return PEOPLE_IDS.filter((id) => ids.includes(id));
+}
+function encodeWho(ids) {
+  return ids.length === 0 ? null : ids.length === 1 ? ids[0] : ids.slice();
+}
+const isEveryone = (ids) => ids.length === PEOPLE_IDS.length;
+// "", "שלומי", "שלומי ורשף", "כולם"
+function whoText(ids) {
+  if (!ids.length) return "";
+  if (isEveryone(ids)) return "כולם";
+  return joinNames(ids.map((id) => NAME_OF[id]));
+}
+
 const NO_SELECTION = new Set();
 function effectiveSelection() { return state.editing ? NO_SELECTION : state.selected; }
 function selectedPeople(sel) { return PEOPLE.filter((p) => sel.has(p.id)); }
 
-// An item shows when nothing is selected, when its person is selected, when it is
-// "כל אחד" and any person is selected, or when it is unassigned and "פנויים" is selected.
+// An item shows when nothing is selected, when any of its people is selected,
+// or when it is unassigned and "פנויים" is selected.
 function passes(it, sel) {
   if (!sel.size) return true;
-  if (!it.who) return sel.has("none");
-  if (it.who === "all") return selectedPeople(sel).length > 0;
-  return sel.has(it.who);
+  if (!it.who.length) return sel.has("none");
+  return it.who.some((id) => sel.has(id));
 }
 
 // "סתיו", "סתיו ושלומי", "סתיו, שלומי ורשף"
@@ -133,14 +152,18 @@ function joinNames(names) {
   return names.slice(0, -1).join(", ") + " ו" + names[names.length - 1];
 }
 
+// single: items one person brings alone; per: every item a person is on; multi: items shared by several.
 function tally() {
-  const c = { total: 0, none: 0, all: 0, done: 0, assigned: 0 };
-  for (const p of PEOPLE) c[p.id] = 0;
+  const c = { total: 0, none: 0, multi: 0, done: 0, assigned: 0, single: {}, per: {} };
+  for (const id of PEOPLE_IDS) { c.single[id] = 0; c.per[id] = 0; }
   for (const it of state.items) {
     c.total++;
     if (it.done) c.done++;
-    if (!it.who) c.none++;
-    else { c.assigned++; c[it.who]++; }
+    if (!it.who.length) { c.none++; continue; }
+    c.assigned++;
+    if (it.who.length === 1) c.single[it.who[0]]++;
+    else c.multi++;
+    for (const id of it.who) c.per[id]++;
   }
   return c;
 }
@@ -264,13 +287,18 @@ function createRow(it) {
 
   const wrap = document.createElement("span");
   wrap.className = "who-wrap";
-  const sel = document.createElement("select");
-  sel.className = "who";
-  sel.id = "who-" + it.id;
-  sel.append(new Option("מי מביא?", ""));
-  for (const p of PEOPLE) sel.append(new Option(p.name, p.id));
-  sel.append(new Option("כל אחד", "all"));
-  wrap.append(sel);
+  const pick = document.createElement("button");
+  pick.type = "button";
+  pick.className = "who";
+  pick.id = "who-" + it.id;
+  pick.setAttribute("aria-haspopup", "dialog");
+  const dots = document.createElement("span");
+  dots.className = "dots";
+  dots.setAttribute("aria-hidden", "true");
+  const lbl = document.createElement("span");
+  lbl.className = "who-lbl";
+  pick.append(dots, lbl);
+  wrap.append(pick);
 
   const del = document.createElement("button");
   del.type = "button";
@@ -282,7 +310,7 @@ function createRow(it) {
 }
 
 function updateRow(li, it) {
-  li.dataset.who = it.who || "";
+  li.dataset.who = !it.who.length ? "" : it.who.length === 1 ? it.who[0] : "multi";
   li.dataset.done = it.done ? "1" : "0";
 
   const nm = li.querySelector(".nm");
@@ -296,10 +324,18 @@ function updateRow(li, it) {
   if (document.activeElement !== nmIn && nmIn.value !== it.name) nmIn.value = it.name;
   if (document.activeElement !== ntIn && ntIn.value !== it.note) ntIn.value = it.note;
 
-  const sel = li.querySelector(".who");
-  const want = it.who || "";
-  if (sel.value !== want) sel.value = want;
-  sel.setAttribute("aria-label", "מי מביא: " + it.name);
+  const pick = li.querySelector(".who");
+  const label = whoText(it.who) || "מי מביא?";
+  const lbl = pick.querySelector(".who-lbl");
+  if (lbl.textContent !== label) lbl.textContent = label;
+  const dots = pick.querySelector(".dots");
+  const dotsKey = it.who.length > 1 ? it.who.join(",") : "";
+  if (dots.dataset.k !== dotsKey) {
+    dots.dataset.k = dotsKey;
+    dots.textContent = "";
+    if (it.who.length > 1) for (const id of it.who) { const d = document.createElement("i"); d.dataset.p = id; dots.append(d); }
+  }
+  pick.setAttribute("aria-label", `מי מביא: ${it.name}. ${it.who.length ? "עכשיו: " + whoText(it.who) : "עוד אף אחד"}`);
 
   const tick = li.querySelector(".tick");
   tick.setAttribute("aria-pressed", it.done ? "true" : "false");
@@ -332,6 +368,7 @@ function render() {
   renderSections();
   renderChrome();
   renderSync();
+  renderWhoSheet();
 }
 
 function renderTally(c) {
@@ -340,7 +377,7 @@ function renderTally(c) {
     ? "אין עדיין פריטים ברשימה"
     : `שובצו ${c.assigned} מתוך ${c.total}` + (c.done ? ` · ${c.done} ארוזים` : "");
   meterEl.textContent = "";
-  const segs = [...PEOPLE.map((p) => [p.id, c[p.id]]), ["all", c.all], ["none", c.none]];
+  const segs = [...PEOPLE_IDS.map((id) => [id, c.single[id]]), ["multi", c.multi], ["none", c.none]];
   for (const [id, n] of segs) {
     if (!n) continue;
     const s = document.createElement("span");
@@ -354,7 +391,7 @@ function renderChips(c) {
   const sel = effectiveSelection();
   for (const b of chipsEl.children) {
     const id = b.dataset.f;
-    const n = id === "all" ? c.total : id === "none" ? c.none : c[id] + c.all;
+    const n = id === "all" ? c.total : id === "none" ? c.none : c.per[id];
     b.querySelector(".n").textContent = state.loaded ? String(n) : "";
     b.setAttribute("aria-pressed", String(id === "all" ? sel.size === 0 : sel.has(id)));
     b.disabled = state.editing;
@@ -376,7 +413,7 @@ function renderSections() {
     sec.hidden = !visible;
     if (!visible) continue;
     shown++;
-    const assigned = all.filter((it) => it.who).length;
+    const assigned = all.filter((it) => it.who.length).length;
     sec.querySelector(".cnt").textContent = all.length ? `${assigned}/${all.length} שובצו` : "";
     reconcile(sec.querySelector(".rows"), rows);
   }
@@ -448,24 +485,28 @@ function withLink(out) {
   return out.join("\n");
 }
 
-// "Who brings what", grouped by person. With names selected, only their part
-// (plus the "כל אחד" items that are theirs too); with "פנויים" selected, the unassigned items.
-// Returns null when the selection has nothing in it.
+// "Who brings what", grouped by person. A shared item shows under each of its people
+// ("– עם רשף"); items all four bring go once under "כולם". With names selected, only their
+// part; with "פנויים" selected, the unassigned items. Returns null when there is nothing to send.
 function summaryByPerson() {
   const items = sortItems(state.items);
   const sel = effectiveSelection();
   const people = sel.size ? selectedPeople(sel) : PEOPLE;
   const out = [];
+  const partners = (it, pid) => {
+    const others = it.who.filter((id) => id !== pid);
+    return others.length ? ` – עם ${joinNames(others.map((id) => NAME_OF[id]))}` : "";
+  };
   for (const p of people) {
-    const mine = items.filter((it) => it.who === p.id);
-    if (mine.length) out.push("", `*${p.name}* (${mine.length})`, ...mine.map(itemLine));
+    const mine = items.filter((it) => it.who.includes(p.id) && !isEveryone(it.who));
+    if (mine.length) out.push("", `*${p.name}* (${mine.length})`, ...mine.map((it) => itemLine(it) + partners(it, p.id)));
   }
   if (!sel.size || people.length) {
-    const every = items.filter((it) => it.who === "all");
-    if (every.length) out.push("", `*כל אחד מביא את שלו* (${every.length})`, ...every.map(itemLine));
+    const everyone = items.filter((it) => isEveryone(it.who));
+    if (everyone.length) out.push("", `*כולם* (${everyone.length})`, ...everyone.map(itemLine));
   }
   if (!sel.size || sel.has("none")) {
-    const free = items.filter((it) => !it.who);
+    const free = items.filter((it) => !it.who.length);
     if (free.length) out.push("", `*עוד פנויים* (${free.length})`, ...free.map(itemLine));
   }
   if (!out.length) return null;
@@ -479,7 +520,7 @@ function summaryByTopic() {
   for (const cat of CATS) {
     const list = items.filter((it) => it.cat === cat.id);
     if (!list.length) continue;
-    out.push("", `*${cat.name}*`, ...list.map((it) => `${itemLine(it)} – ${it.who ? WHO_LABEL[it.who] : "פנוי"}`));
+    out.push("", `*${cat.name}*`, ...list.map((it) => `${itemLine(it)} – ${it.who.length ? whoText(it.who) : "פנוי"}`));
   }
   const own = (personal.loaded ? personal.items : DEFAULT_PERSONAL.map((p) => normPersonal(p.id, p)))
     .slice().sort((a, b) => (a.order - b.order) || a.name.localeCompare(b.name, "he"));
@@ -558,10 +599,7 @@ catsEl.addEventListener("change", (e) => {
   if (!it) return;
   const id = it.id;
   let patch = null;
-  if (t.classList.contains("who")) {
-    const who = t.value || null;
-    if (who !== it.who) patch = { who };
-  } else if (t.classList.contains("nm-in")) {
+  if (t.classList.contains("nm-in")) {
     const name = t.value.trim().slice(0, 60);
     if (!name) { t.value = it.name; return; }
     if (name !== it.name) patch = { name };
@@ -581,7 +619,9 @@ catsEl.addEventListener("click", (e) => {
   const it = findItem(btn.closest(".row"));
   if (!it) return;
   const id = it.id;
-  if (btn.classList.contains("tick")) {
+  if (btn.classList.contains("who")) {
+    openWhoSheet(id, btn);
+  } else if (btn.classList.contains("tick")) {
     const patch = { done: !it.done };
     patchLocal(id, patch);
     render();
@@ -638,6 +678,7 @@ chipsEl.addEventListener("click", (e) => {
 
 editBtn.addEventListener("click", () => {
   if (!api) return;
+  closeWhoSheet();
   state.editing = !state.editing;
   render();
 });
@@ -690,6 +731,92 @@ copyClose.addEventListener("click", () => {
   copyPanel.hidden = true;
   copyBtn.focus();
 });
+
+/* ---------- "who brings it" picker: several names per item ---------- */
+
+const whoSheet = $("whoSheet");
+const whoBackdrop = $("whoBackdrop");
+const whoSheetItem = $("whoSheetItem");
+const whoOptions = $("whoOptions");
+const whoAllBtn = $("whoAll");
+const whoNoneBtn = $("whoNone");
+const whoDoneBtn = $("whoDone");
+let sheetItemId = null;
+let sheetReturnFocus = null;
+
+function buildWhoOptions() {
+  for (const p of PEOPLE) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "who-opt";
+    b.dataset.p = p.id;
+    b.setAttribute("aria-pressed", "false");
+    const dot = document.createElement("span");
+    dot.className = "dot";
+    const lbl = document.createElement("span");
+    lbl.className = "lbl";
+    lbl.textContent = p.name;
+    const chk = document.createElement("span");
+    chk.className = "chk";
+    chk.setAttribute("aria-hidden", "true");
+    b.append(dot, lbl, chk);
+    whoOptions.append(b);
+  }
+}
+
+function openWhoSheet(id, trigger) {
+  sheetItemId = id;
+  sheetReturnFocus = trigger;
+  whoBackdrop.hidden = false;
+  whoSheet.hidden = false;
+  renderWhoSheet();
+  whoOptions.querySelector(".who-opt").focus();
+}
+
+function closeWhoSheet() {
+  if (sheetItemId === null) return;
+  sheetItemId = null;
+  whoBackdrop.hidden = true;
+  whoSheet.hidden = true;
+  if (sheetReturnFocus && document.contains(sheetReturnFocus)) sheetReturnFocus.focus();
+  sheetReturnFocus = null;
+}
+
+function renderWhoSheet() {
+  if (sheetItemId === null) return;
+  const it = state.items.find((x) => x.id === sheetItemId);
+  if (!it) { closeWhoSheet(); return; } // deleted by someone meanwhile
+  if (whoSheetItem.textContent !== it.name) whoSheetItem.textContent = it.name;
+  for (const b of whoOptions.children) b.setAttribute("aria-pressed", String(it.who.includes(b.dataset.p)));
+  whoAllBtn.disabled = isEveryone(it.who);
+  whoNoneBtn.disabled = !it.who.length;
+}
+
+// Every tap saves right away, like the rest of the page.
+function setWho(ids) {
+  const it = state.items.find((x) => x.id === sheetItemId);
+  if (!it || !api) return;
+  const next = PEOPLE_IDS.filter((id) => ids.includes(id));
+  if (next.join() === it.who.join()) return;
+  const id = it.id;
+  patchLocal(id, { who: next });
+  render();
+  const stored = encodeWho(next);
+  enqueue(id, () => api.update(id, { who: stored }));
+}
+
+whoOptions.addEventListener("click", (e) => {
+  const b = e.target.closest(".who-opt");
+  const it = b && state.items.find((x) => x.id === sheetItemId);
+  if (!it) return;
+  const p = b.dataset.p;
+  setWho(it.who.includes(p) ? it.who.filter((x) => x !== p) : [...it.who, p]);
+});
+whoAllBtn.addEventListener("click", () => setWho(PEOPLE_IDS.slice()));
+whoNoneBtn.addEventListener("click", () => setWho([]));
+whoDoneBtn.addEventListener("click", closeWhoSheet);
+whoBackdrop.addEventListener("click", closeWhoSheet);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sheetItemId !== null) closeWhoSheet(); });
 
 window.addEventListener("online", renderSync);
 window.addEventListener("offline", renderSync);
@@ -1007,6 +1134,7 @@ async function connect() {
 
 buildChips();
 buildSections();
+buildWhoOptions();
 renderPersonal();
 renderSync();
 connect();
