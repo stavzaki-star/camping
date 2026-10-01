@@ -122,15 +122,12 @@ h1 {
   padding: 12px 16px;
   background: var(--paper);
 }
+/* All names stay visible (wrapping) now that several can be picked at once. */
 .chips {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  padding-block: 2px;
-  margin-block: -2px;
 }
-.chips::-webkit-scrollbar { display: none; }
 .chip {
   flex: none;
   display: inline-flex;
@@ -181,7 +178,7 @@ h1 {
 .btn.ghost { background: transparent; color: var(--ink); }
 .btn.ghost[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
 .btn.small { min-height: 40px; padding-inline: 14px; font-size: .9rem; }
-.edit-hint { margin: -6px 0 16px; font-size: .88rem; color: var(--ink-soft); }
+.edit-hint, .sel-hint { margin: -6px 0 16px; font-size: .88rem; color: var(--ink-soft); }
 .notice {
   margin: 0 0 16px;
   padding: 12px 14px;
@@ -484,15 +481,17 @@ h1 {
   </section>
 
   <div id="filtersAnchor"></div>
-  <nav class="filters" id="filters" aria-label="סינון לפי מי מביא" hidden>
+  <nav class="filters" id="filters" aria-label="סינון לפי מי מביא. אפשר לבחור כמה שמות" hidden>
     <div class="chips" id="chips"></div>
   </nav>
 
   <div class="actions" id="actions" hidden>
     <button type="button" class="btn" id="copyBtn">העתקה לוואטסאפ</button>
     <a class="btn ghost" id="waLink" href="https://wa.me/" target="_blank" rel="noopener noreferrer">שליחה בוואטסאפ</a>
+    <a class="btn ghost" id="waAllLink" href="https://wa.me/" target="_blank" rel="noopener noreferrer">כל הרשימה לוואטסאפ</a>
     <button type="button" class="btn ghost" id="editBtn" aria-pressed="false">עריכת הרשימה</button>
   </div>
+  <p class="sel-hint" id="selHint" aria-live="polite" hidden></p>
   <p class="edit-hint" id="editHint" hidden>במצב עריכה משנים שם או כמות, מוחקים פריטים, ומוסיפים חדשים בתחתית כל קטגוריה.</p>
   <p class="notice" id="notice" role="alert" hidden></p>
 

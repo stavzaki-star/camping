@@ -45,6 +45,8 @@ const skel = $("skel");
 const actionsEl = $("actions");
 const copyBtn = $("copyBtn");
 const waLink = $("waLink");
+const waAllLink = $("waAllLink");
+const selHint = $("selHint");
 const editBtn = $("editBtn");
 const editHint = $("editHint");
 const noticeEl = $("notice");
@@ -70,13 +72,22 @@ const local = {
   }
 };
 
-const savedFilter = local.get("camping.filter", "all");
+// Which names (and/or "פנויים") are selected. Empty means everything is shown.
+const SEL_KEY = "camping.selection.v2";
+function loadSelection() {
+  let saved = local.get(SEL_KEY, null);
+  if (!Array.isArray(saved)) {
+    const old = local.get("camping.filter", "all"); // single-name filter from the previous version
+    saved = old && old !== "all" ? [old] : [];
+  }
+  return new Set(saved.filter((id) => FILTER_IDS.includes(id) && id !== "all"));
+}
 const state = {
   items: [],
   loaded: false,
   live: "wait",
   editing: false,
-  filter: FILTER_IDS.includes(savedFilter) ? savedFilter : "all",
+  selected: loadSelection(),
   pending: 0,
   savedFlash: false
 };
@@ -103,12 +114,23 @@ function sortItems(list) {
     (CAT_POS.get(a.cat) - CAT_POS.get(b.cat)) || (a.order - b.order) || a.name.localeCompare(b.name, "he"));
 }
 
-function effectiveFilter() { return state.editing ? "all" : state.filter; }
+const NO_SELECTION = new Set();
+function effectiveSelection() { return state.editing ? NO_SELECTION : state.selected; }
+function selectedPeople(sel) { return PEOPLE.filter((p) => sel.has(p.id)); }
 
-function passes(it, f) {
-  if (f === "all") return true;
-  if (f === "none") return !it.who;
-  return it.who === f || it.who === "all";
+// An item shows when nothing is selected, when its person is selected, when it is
+// "כל אחד" and any person is selected, or when it is unassigned and "פנויים" is selected.
+function passes(it, sel) {
+  if (!sel.size) return true;
+  if (!it.who) return sel.has("none");
+  if (it.who === "all") return selectedPeople(sel).length > 0;
+  return sel.has(it.who);
+}
+
+// "סתיו", "סתיו ושלומי", "סתיו, שלומי ורשף"
+function joinNames(names) {
+  if (names.length <= 1) return names.join("");
+  return names.slice(0, -1).join(", ") + " ו" + names[names.length - 1];
 }
 
 function tally() {
@@ -329,19 +351,19 @@ function renderTally(c) {
 }
 
 function renderChips(c) {
-  const f = effectiveFilter();
+  const sel = effectiveSelection();
   for (const b of chipsEl.children) {
     const id = b.dataset.f;
     const n = id === "all" ? c.total : id === "none" ? c.none : c[id] + c.all;
     b.querySelector(".n").textContent = state.loaded ? String(n) : "";
-    b.setAttribute("aria-pressed", String(f === id));
+    b.setAttribute("aria-pressed", String(id === "all" ? sel.size === 0 : sel.has(id)));
     b.disabled = state.editing;
   }
 }
 
 function renderSections() {
   if (!state.loaded) return;
-  const f = effectiveFilter();
+  const sel = effectiveSelection();
   const byCat = new Map(CATS.map((cat) => [cat.id, []]));
   for (const it of sortItems(state.items)) byCat.get(it.cat).push(it);
 
@@ -349,7 +371,7 @@ function renderSections() {
   for (const cat of CATS) {
     const sec = sections.get(cat.id);
     const all = byCat.get(cat.id);
-    const rows = all.filter((it) => passes(it, f));
+    const rows = all.filter((it) => passes(it, sel));
     const visible = rows.length > 0 || state.editing;
     sec.hidden = !visible;
     if (!visible) continue;
@@ -367,10 +389,11 @@ function renderSections() {
   listState.hidden = false;
   if (state.items.length === 0) {
     listStateText.textContent = "הרשימה עדיין ריקה. לחצו על ״עריכת הרשימה״ כדי להוסיף פריט ראשון.";
-  } else if (f === "none") {
-    listStateText.textContent = "כל הפריטים כבר שובצו.";
   } else {
-    listStateText.textContent = `${WHO_LABEL[f] || ""} עוד לא לקח כלום.`;
+    const people = selectedPeople(sel);
+    if (!people.length) listStateText.textContent = "כל הפריטים כבר שובצו.";
+    else if (sel.has("none")) listStateText.textContent = "אין פריטים בבחירה הזו.";
+    else listStateText.textContent = `${joinNames(people.map((p) => p.name))} עוד לא ${people.length > 1 ? "לקחו" : "לקח"} כלום.`;
   }
 }
 
@@ -380,7 +403,10 @@ function renderChrome() {
   const hasItems = state.items.length > 0;
   copyBtn.hidden = !hasItems;
   waLink.hidden = !hasItems;
-  if (hasItems) waLink.href = "https://wa.me/?text=" + encodeURIComponent(summary(true));
+  waAllLink.hidden = !hasItems;
+  const sel = effectiveSelection();
+  selHint.hidden = !hasItems || !sel.size;
+  if (sel.size) selHint.textContent = `העתקה ושליחה בוואטסאפ יכללו רק את ${selectionPhrase(sel)}. ״כל הרשימה לוואטסאפ״ שולח תמיד את הכול.`;
   editBtn.setAttribute("aria-pressed", String(state.editing));
   editBtn.textContent = state.editing ? "סיום עריכה" : "עריכת הרשימה";
   editHint.hidden = !state.editing;
@@ -405,23 +431,60 @@ function pageUrl() {
   return location.protocol.startsWith("http") ? location.href.split("#")[0] : "";
 }
 
-// Full version for the copy button; the WhatsApp share link gets a short one
-// (who brings what, how many are still free, and the link) so the message stays readable.
-function summary(short) {
-  const items = sortItems(state.items);
-  const line = (it) => `${it.done ? "✓" : "•"} ${it.name}${it.note && !short ? ` (${it.note})` : ""}`;
-  const out = ["*קמפינג: מי מביא מה*"];
-  for (const p of [...PEOPLE, { id: "all", name: "כל אחד מביא לעצמו" }]) {
-    const mine = items.filter((it) => it.who === p.id);
-    if (!mine.length) continue;
-    out.push("", `*${p.name}* (${mine.length})`, ...mine.map(line));
-  }
-  const free = items.filter((it) => !it.who);
-  if (free.length && short) out.push("", `עוד ${free.length} פריטים פנויים.`);
-  else if (free.length) out.push("", `*עוד פנויים* (${free.length})`, ...free.map(line));
+// "הפריטים של סתיו ושלומי", "הפריטים הפנויים", or both.
+function selectionPhrase(sel) {
+  const people = selectedPeople(sel);
+  const parts = [];
+  if (people.length) parts.push(`הפריטים של ${joinNames(people.map((p) => p.name))}`);
+  if (sel.has("none")) parts.push("הפריטים הפנויים");
+  return parts.join(" ו");
+}
+
+const itemLine = (it) => `${it.done ? "✓" : "•"} ${it.name}${it.note ? ` (${it.note})` : ""}`;
+
+function withLink(out) {
   const url = pageUrl();
   if (url) out.push("", "לבחירה ולעדכון: " + url);
   return out.join("\n");
+}
+
+// "Who brings what", grouped by person. With names selected, only their part
+// (plus the "כל אחד" items that are theirs too); with "פנויים" selected, the unassigned items.
+// Returns null when the selection has nothing in it.
+function summaryByPerson() {
+  const items = sortItems(state.items);
+  const sel = effectiveSelection();
+  const people = sel.size ? selectedPeople(sel) : PEOPLE;
+  const out = [];
+  for (const p of people) {
+    const mine = items.filter((it) => it.who === p.id);
+    if (mine.length) out.push("", `*${p.name}* (${mine.length})`, ...mine.map(itemLine));
+  }
+  if (!sel.size || people.length) {
+    const every = items.filter((it) => it.who === "all");
+    if (every.length) out.push("", `*כל אחד מביא את שלו* (${every.length})`, ...every.map(itemLine));
+  }
+  if (!sel.size || sel.has("none")) {
+    const free = items.filter((it) => !it.who);
+    if (free.length) out.push("", `*עוד פנויים* (${free.length})`, ...free.map(itemLine));
+  }
+  if (!out.length) return null;
+  return withLink(["*קמפינג: מי מביא מה*", ...out]);
+}
+
+// The whole list by topic, who brings each item, and the "כל אחד לעצמו" list.
+function summaryByTopic() {
+  const items = sortItems(state.items);
+  const out = ["*קמפינג: כל הרשימה*"];
+  for (const cat of CATS) {
+    const list = items.filter((it) => it.cat === cat.id);
+    if (!list.length) continue;
+    out.push("", `*${cat.name}*`, ...list.map((it) => `${itemLine(it)} – ${it.who ? WHO_LABEL[it.who] : "פנוי"}`));
+  }
+  const own = (personal.loaded ? personal.items : DEFAULT_PERSONAL.map((p) => normPersonal(p.id, p)))
+    .slice().sort((a, b) => (a.order - b.order) || a.name.localeCompare(b.name, "he"));
+  if (own.length) out.push("", "*כל אחד לעצמו*", ...own.map((p) => `• ${p.name}`));
+  return withLink(out);
 }
 
 let toastTimer = 0;
@@ -564,8 +627,10 @@ chipsEl.addEventListener("click", (e) => {
   const b = e.target.closest(".chip");
   if (!b || state.editing) return;
   const f = b.dataset.f;
-  state.filter = state.filter === f && f !== "all" ? "all" : f;
-  local.set("camping.filter", state.filter);
+  if (f === "all") state.selected.clear();
+  else if (state.selected.has(f)) state.selected.delete(f);
+  else state.selected.add(f);
+  local.set(SEL_KEY, Array.from(state.selected));
   render();
   const anchorTop = filtersAnchor.getBoundingClientRect().top + window.scrollY;
   if (window.scrollY > anchorTop) window.scrollTo({ top: anchorTop, behavior: reduceMotion ? "auto" : "smooth" });
@@ -577,9 +642,7 @@ editBtn.addEventListener("click", () => {
   render();
 });
 
-copyBtn.addEventListener("click", () => {
-  const text = summary();
-  const ok = () => toast("הסיכום הועתק. אפשר להדביק בקבוצה.");
+function copyToClipboard(text, okMessage) {
   const fallback = () => {
     copyText.value = text;
     copyPanel.hidden = false;
@@ -587,12 +650,41 @@ copyBtn.addEventListener("click", () => {
     copyText.select();
   };
   try {
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, fallback);
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => toast(okMessage), fallback);
     else fallback();
   } catch (err) {
     fallback();
   }
+}
+
+const EMPTY_SELECTION_MSG = "אין מה לשלוח: אין פריטים בבחירה הזו.";
+
+copyBtn.addEventListener("click", () => {
+  const text = summaryByPerson();
+  if (!text) { toast(EMPTY_SELECTION_MSG); return; }
+  const sel = effectiveSelection();
+  copyToClipboard(text, sel.size
+    ? `הועתקו רק ${selectionPhrase(sel)}. אפשר להדביק בוואטסאפ.`
+    : "הסיכום הועתק. אפשר להדביק בקבוצה.");
 });
+
+// WhatsApp links are real links (so a tap opens the app directly); the text is filled in on tap.
+// Very long texts can fail as a link, so they go through the phone's share menu, or get copied on a computer.
+const WA_MAX_URL = 6000;
+const isTouch = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+function wireWhatsAppLink(link, build) {
+  link.addEventListener("click", (e) => {
+    const text = build();
+    if (!text) { e.preventDefault(); toast(EMPTY_SELECTION_MSG); return; }
+    const url = "https://wa.me/?text=" + encodeURIComponent(text);
+    if (url.length <= WA_MAX_URL) { link.href = url; return; }
+    e.preventDefault();
+    if (isTouch && navigator.share) navigator.share({ text }).catch(() => {});
+    else copyToClipboard(text, "הרשימה ארוכה מדי לשליחה ישירה, אז העתקתי אותה. הדביקו בוואטסאפ.");
+  });
+}
+wireWhatsAppLink(waLink, summaryByPerson);
+wireWhatsAppLink(waAllLink, summaryByTopic);
 
 copyClose.addEventListener("click", () => {
   copyPanel.hidden = true;
